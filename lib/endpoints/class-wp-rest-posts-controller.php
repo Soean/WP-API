@@ -11,6 +11,14 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 	protected $post_type;
 
 	/**
+	 * Instance of a post meta fields object.
+	 *
+	 * @access protected
+	 * @var WP_REST_Post_Meta_Fields
+	 */
+	protected $meta;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string $post_type Post type.
@@ -135,7 +143,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 		// For each known parameter which is both registered and present in the request,
 		// set the parameter's value on the query $args.
 		foreach ( $parameter_mappings as $api_param => $wp_param ) {
-			if ( isset( $registered[ $api_param ] ) && isset( $request[ $api_param ] ) ) {
+			if ( isset( $registered[ $api_param ], $request[ $api_param ] ) ) {
 				$args[ $wp_param ] = $request[ $api_param ];
 			}
 		}
@@ -144,12 +152,12 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 
 		$args['date_query'] = array();
 		// Set before into date query. Date query must be specified as an array of an array.
-		if ( isset( $registered['before'] ) && isset( $request['before'] ) ) {
+		if ( isset( $registered['before'], $request['before'] ) ) {
 			$args['date_query'][0]['before'] = $request['before'];
 		}
 
 		// Set after into date query. Date query must be specified as an array of an array.
-		if ( isset( $registered['after'] ) && isset( $request['after'] ) ) {
+		if ( isset( $registered['after'], $request['after'] ) ) {
 			$args['date_query'][0]['after'] = $request['after'];
 		}
 
@@ -163,7 +171,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 			$args['posts_per_page'] = $request['per_page'];
 		}
 
-		if ( isset( $registered['sticky'] ) && isset( $request['sticky'] ) ) {
+		if ( isset( $registered['sticky'], $request['sticky'] ) ) {
 			$sticky_posts = get_option( 'sticky_posts', array() );
 			if ( $sticky_posts && $request['sticky'] ) {
 				// As post__in will be used to only get sticky posts,
@@ -270,8 +278,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 		$request_params = $request->get_query_params();
 		if ( ! empty( $request_params['filter'] ) ) {
 			// Normalize the pagination params.
-			unset( $request_params['filter']['posts_per_page'] );
-			unset( $request_params['filter']['paged'] );
+			unset( $request_params['filter']['posts_per_page'], $request_params['filter']['paged'] );
 		}
 		$base = add_query_arg( $request_params, rest_url( sprintf( '%s/%s', $this->namespace, $this->rest_base ) ) );
 
@@ -326,14 +333,14 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Can the user access passworded content?
+	 * Can the user access password-protected content?
 	 *
 	 * This method determines whether we need to override the regular password
 	 * check in core with a filter.
 	 *
 	 * @param WP_Post         $post    Post to check against.
 	 * @param WP_REST_Request $request Request data to check.
-	 * @return bool True if the user can access passworded content, false otherwise.
+	 * @return bool True if the user can access password-protected content, false otherwise.
 	 */
 	protected function can_access_password_content( $post, $request ) {
 		if ( empty( $post->post_password ) ) {
@@ -341,7 +348,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 			return false;
 		}
 
-		// Edit context always gets access to passworded posts.
+		// Edit context always gets access to password-protected posts.
 		if ( 'edit' === $request['context'] ) {
 			return true;
 		}
@@ -424,7 +431,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 
 		if ( is_wp_error( $post_id ) ) {
 
-			if ( in_array( $post_id->get_error_code(), array( 'db_insert_error' ), true ) ) {
+			if ( 'db_insert_error' === $post_id->get_error_code() ) {
 				$post_id->add_data( array( 'status' => 500 ) );
 			} else {
 				$post_id->add_data( array( 'status' => 400 ) );
@@ -537,7 +544,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 		// convert the post object to an array, otherwise wp_update_post will expect non-escaped input.
 		$post_id = wp_update_post( (array) $post, true );
 		if ( is_wp_error( $post_id ) ) {
-			if ( in_array( $post_id->get_error_code(), array( 'db_update_error' ), true ) ) {
+			if ( 'db_update_error' === $post_id->get_error_code() ) {
 				$post_id->add_data( array( 'status' => 500 ) );
 			} else {
 				$post_id->add_data( array( 'status' => 400 ) );
@@ -688,7 +695,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 	 * Determine the allowed query_vars for a get_items() response and
 	 * prepare for WP_Query.
 	 *
-	 * @param array           $prepared_args Prepared WP_Query Arguments.
+	 * @param array           $prepared_args Prepared WP_Query arguments.
 	 * @param WP_REST_Request $request       Full details about the request.
 	 * @return array          $query_args
 	 */
@@ -1042,7 +1049,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 	 *
 	 * @param  int             $post_id The post ID to update the terms form.
 	 * @param  WP_REST_Request $request The request object with post and terms data.
-	 * @return null|WP_Error   WP_Error on an error assigning any of ther terms.
+	 * @return null|WP_Error   WP_Error on an error assigning any of the terms.
 	 */
 	protected function handle_terms( $post_id, $request ) {
 		$taxonomies = wp_list_filter( get_object_taxonomies( $this->post_type, 'objects' ), array( 'show_in_rest' => true ) );
@@ -1389,7 +1396,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 				'href'       => rest_url( 'wp/v2/users/' . $post->post_author ),
 				'embeddable' => true,
 			);
-		};
+		}
 
 		if ( in_array( $post->post_type, array( 'post', 'page' ), true ) || post_type_supports( $post->post_type, 'comments' ) ) {
 			$replies_url = rest_url( 'wp/v2/comments' );
@@ -1610,7 +1617,7 @@ class WP_REST_Posts_Controller extends WP_REST_Controller {
 		foreach ( $post_type_attributes as $attribute ) {
 			if ( isset( $fixed_schemas[ $this->post_type ] ) && ! in_array( $attribute, $fixed_schemas[ $this->post_type ], true ) ) {
 				continue;
-			} elseif ( ! in_array( $this->post_type, array_keys( $fixed_schemas ), true ) && ! post_type_supports( $this->post_type, $attribute ) ) {
+			} elseif ( ! isset( $fixed_schemas[ $this->post_type ] ) && ! post_type_supports( $this->post_type, $attribute ) ) {
 				continue;
 			}
 
